@@ -36,8 +36,12 @@ spec:
             steps{
                 script{
                     dockerImage = docker.build dockerImageName
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                        dockerImage.push("latest")
+                    // 컨테이너 컨텍스트를 명시적으로 지정하여 docker 명령을 실행합니다.
+                    container('dind') { 
+                        dockerImage = docker.build dockerImageName
+                        docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                            dockerImage.push("latest")
+                        }
                     }
                 }
             }
@@ -58,8 +62,10 @@ spec:
     post{
         always{
             script {
-                container('jnlp'){
-                sh 'docker logout'
+                node('') { // 👈 수정: container 스텝을 node 스텝으로 감싸 Node 컨텍스트를 제공합니다.
+                    container('jnlp') {
+                        sh 'docker logout'
+                    }
                 }
             }
         }
