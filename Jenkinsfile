@@ -48,15 +48,14 @@ spec:
                         """
                     }
                     
-                    // 2. 로그인 및 푸시, 그리고 정리 (logout)
+                    // 2. 로그인, 푸시, 그리고 정리 (finally 블록에 logout을 넣어 컨텍스트 유지)
                     docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
                         try {
                             container('dind') {
                                 sh "docker push registry.hub.docker.com/${dockerImageName}:latest"
                             }
                         } finally {
-                            // 👈 최종 해결: 크리덴셜 사용 직후, 동일한 Pod/Node 컨텍스트 내에서 로그아웃
-                            // post로 분리하지 않고, withRegistry의 논리적 끝에서 정리
+                            // 크리덴셜 사용 직후, Pod 내부에서 로그아웃
                             container('dind') { 
                                 sh 'docker logout' 
                             }
@@ -80,8 +79,11 @@ spec:
             }
         }
     }
-    // post 섹션을 완전히 제거합니다. (로그아웃 로직이 스테이지 내부로 이동)
     post{
-        // 이전 오류를 반복하지 않기 위해 이 부분을 비우거나 제거합니다.
+        // 👈 수정: 문법 오류를 피하기 위해 더미 블록을 추가합니다.
+        success {
+            // 더미 액션 (필요한 로그아웃은 이미 스테이지 내부로 이동)
+            echo 'Cleanup complete (Docker logout was executed in previous stage).'
+        }
     }
 }
