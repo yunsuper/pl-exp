@@ -10,13 +10,7 @@ kind: Pod
 spec:
   containers:
   - name: jnlp
-    // 👈 수정: JNLP 연결 문제 해결을 위해 표준 Jenkins Agent 이미지로 교체
-    image: jenkins/inbound-agent:latest
-    args:
-    - $(JENKINS_AGENT_NAME)
-    - $(JENKINS_SECRET)
-    - -url
-    - $(JENKINS_URL)
+    image: sheayun/jnlp-agent-sample
     env:
     - name: DOCKER_HOST
       value: "tcp://localhost:2375"
@@ -41,48 +35,29 @@ spec:
         stage('docker build && push'){
             steps{
                 script{
-                    // 1. 빌드
-                    container('dind') { 
-                        sh """
-                        docker build -t ${dockerImageName} .
-                        docker tag ${dockerImageName}:latest registry.hub.docker.com/${dockerImageName}:latest
-                        """
-                    }
-                    
-                    // 2. 로그인, 푸시, 그리고 정리 (finally 블록에 logout을 넣어 컨텍스트 유지)
+                    dockerImage = docker.build dockerImageName
                     docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                        try {
-                            container('dind') {
-                                sh "docker push registry.hub.docker.com/${dockerImageName}:latest"
-                            }
-                        } finally {
-                            // 크리덴셜 사용 직후, Pod 내부에서 로그아웃
-                            container('dind') { 
-                                sh 'docker logout' 
-                            }
-                        }
+                        dockerImage.push("latest")
                     }
                 }
             }
         }
         stage('deploy application on kubernetes cluster'){
             steps{
-                container('jnlp') { 
-                    withKubeConfig([credentialsId: 'KUBECONFIG',
-                    serverUrl: 'https://kubernetes.default',
-                    namespace: 'default']) {
-                        sh '''
-                        kubectl apply -f deployment.yaml
-                        kubectl apply -f service.yaml
-                        '''
-                    }
+                withKubeConfig([credentialsId: 'KUBECONFIG',
+                serverUrl: 'https://kubernetes.default',
+                namespace: 'default']) {
+                    sh '''
+                    kubectl apply -f deployment.yaml
+                    kubectl apply -f service.yaml
+                    '''
                 }
             }
         }
     }
     post{
-        success {
-            echo 'Cleanup status: Docker logout was executed in the previous stage.'
+        always{
+            sh 'docker logout'
         }
     }
 }
