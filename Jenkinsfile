@@ -11,6 +11,11 @@ spec:
   containers:
   - name: jnlp
     image: sheayun/jnlp-agent-sample
+    args:
+    - $(JENKINS_AGENT_NAME)
+    - $(JENKINS_SECRET)
+    - -url
+    - $(JENKINS_URL)
     env:
     - name: DOCKER_HOST
       value: "tcp://localhost:2375"
@@ -34,24 +39,35 @@ spec:
         }
         stage('docker build && push'){
             steps{
-                container('dind') { // 👈 컨테이너 지정
-                    sh """
-                    // 셸 명령으로 Docker 빌드를 명시합니다.
-                    docker build -t ${dockerImageName} .
-                    docker tag ${dockerImageName}:latest registry.hub.docker.com/${dockerImageName}:latest
+                script{
+                    // 1. 빌드 (dind 컨테이너 사용)
+                    container('dind') { 
+                        sh """
+                        docker build -t ${dockerImageName} .
+                        docker tag ${dockerImageName}:latest registry.hub.docker.com/${dockerImageName}:latest
+                        """
+                    }
                     
-                    // docker.withRegistry 대신 sh 명령으로 로그인/푸시를 분리합니다.
-                    // 이전에 설정된 'dockerhub-credentials'는 sh 명령에서 바로 사용할 수 없으므로,
-                    // credentialsId를 통해 비밀번호를 획득하여 푸시해야 합니다. (이 부분은 사용자 환경에 맞게 조정 필요)
-                    // 현재는 편의상 셸에서 직접 푸시하도록 가정합니다.
-                    docker push registry.hub.docker.com/${dockerImageName}:latest
-                    """
+                    // 2. 로그인 및 푸시, 그리고 정리 (logout)
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                        try {
+                            container('dind') {
+                                sh "docker push registry.hub.docker.com/${dockerImageName}:latest"
+                            }
+                        } finally {
+                            // 👈 최종 해결: 크리덴셜 사용 직후, 동일한 Pod/Node 컨텍스트 내에서 로그아웃
+                            // post로 분리하지 않고, withRegistry의 논리적 끝에서 정리
+                            container('dind') { 
+                                sh 'docker logout' 
+                            }
+                        }
+                    }
                 }
             }
         }
         stage('deploy application on kubernetes cluster'){
             steps{
-                container('jnlp') { // Kubectl 실행 컨테이너 지정
+                container('jnlp') { 
                     withKubeConfig([credentialsId: 'KUBECONFIG',
                     serverUrl: 'https://kubernetes.default',
                     namespace: 'default']) {
@@ -64,11 +80,8 @@ spec:
             }
         }
     }
+    // post 섹션을 완전히 제거합니다. (로그아웃 로직이 스테이지 내부로 이동)
     post{
-        always{
-            // sh 명령을 가장 단순화하여 Master Node의 셸에서 실행되도록 시도합니다.
-            // Jenkinsfile이 복잡한 컨텍스트를 벗어나도록 합니다.
-            sh 'docker logout' 
-        }
+        // 이전 오류를 반복하지 않기 위해 이 부분을 비우거나 제거합니다.
     }
 }
