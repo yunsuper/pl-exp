@@ -10,7 +10,8 @@ kind: Pod
 spec:
   containers:
   - name: jnlp
-    image: sheayun/jnlp-agent-sample
+    // 👈 수정: JNLP 연결 문제 해결을 위해 표준 Jenkins Agent 이미지로 교체
+    image: jenkins/inbound-agent:latest
     args:
     - $(JENKINS_AGENT_NAME)
     - $(JENKINS_SECRET)
@@ -40,7 +41,7 @@ spec:
         stage('docker build && push'){
             steps{
                 script{
-                    // 1. 빌드 (dind 컨테이너 사용)
+                    // 1. 빌드
                     container('dind') { 
                         sh """
                         docker build -t ${dockerImageName} .
@@ -80,10 +81,8 @@ spec:
         }
     }
     post{
-        // 👈 수정: 문법 오류를 피하기 위해 더미 블록을 추가합니다.
         success {
-            // 더미 액션 (필요한 로그아웃은 이미 스테이지 내부로 이동)
-            echo 'Cleanup complete (Docker logout was executed in previous stage).'
+            echo 'Cleanup status: Docker logout was executed in the previous stage.'
         }
     }
 }
