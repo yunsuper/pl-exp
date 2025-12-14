@@ -35,10 +35,8 @@ spec:
         stage('docker build && push'){
             steps{
                 script{
-                    dockerImage = docker.build dockerImageName
-                    // 컨테이너 컨텍스트를 명시적으로 지정하여 docker 명령을 실행합니다.
-                    container('dind') { 
-                        dockerImage = docker.build dockerImageName
+                    container('dind') { // Docker Build는 DinD 컨테이너에서 실행
+                        def dockerImage = docker.build dockerImageName
                         docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
                             dockerImage.push("latest")
                         }
@@ -48,24 +46,25 @@ spec:
         }
         stage('deploy application on kubernetes cluster'){
             steps{
-                withKubeConfig([credentialsId: 'KUBECONFIG',
-                serverUrl: 'https://kubernetes.default',
-                namespace: 'default']) {
-                    sh '''
-                    kubectl apply -f deployment.yaml
-                    kubectl apply -f service.yaml
-                    '''
+                container('jnlp') { // Kubectl은 JNLP 컨테이너에서 실행 (kubectl이 설치되어 있다고 가정)
+                    withKubeConfig([credentialsId: 'KUBECONFIG',
+                    serverUrl: 'https://kubernetes.default',
+                    namespace: 'default']) {
+                        sh '''
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
+                        '''
+                    }
                 }
             }
         }
     }
     post{
         always{
+            // 전역 post는 반드시 node로 감싸서 컨텍스트를 복구해야 합니다.
             script {
-                node('') { // 👈 수정: container 스텝을 node 스텝으로 감싸 Node 컨텍스트를 제공합니다.
-                    container('jnlp') {
-                        sh 'docker logout'
-                    }
+                node('') { 
+                    sh 'docker logout' // docker logout은 jnlp 컨테이너에서 실행 가능
                 }
             }
         }
