@@ -57,8 +57,10 @@ spec:
     }
     post{
         always{
-            script { // 👈 수정: sh 명령어를 script로 감싸 컨텍스트 오류를 해결합니다.
+            script {
+                node(''){// 👈 수정: sh 명령어를 script로 감싸 컨텍스트 오류를 해결합니다.
                 sh 'docker logout'
+                }
             }
         }
     }
