@@ -5,25 +5,25 @@ pipeline {
     agent {
         kubernetes{
             yaml '''
-            apiVersion: v1
-            king: Pod
-            spec:
-                containers:
-                -name: jnlp
-                image: sheayun/jnlp-agent-sample
-                env:
-                -name: DOCKER_HOST
-                value: "tcp://localhost:2375"
-                -name: dind
-                image: docker:latest
-                command:
-                - /usr/local/bin/docerd-entrypoint.sh
-                env:
-                -name: DOCKER_TLS_CERTDIR
-                value: ""
-                securityContext:
-                privileged: true
-            '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: jnlp
+    image: sheayun/jnlp-agent-sample
+    env:
+    - name: DOCKER_HOST
+      value: "tcp://localhost:2375"
+  - name: dind
+    image: docker:latest
+    command:
+    - /usr/local/bin/dockerd-entrypoint.sh
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+'''
         }
     }
     stages{
