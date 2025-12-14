@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
       - name: simple-echo
-        image: <Your image registry here>
+        image: shaeyun/junkins-agent-sample
         ports:
         - containerPort: 80
